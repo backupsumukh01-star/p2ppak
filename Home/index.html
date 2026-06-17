@@ -1,0 +1,1652 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeerHub - USDT Orders</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="js/jquery-3.6.0.min.js"></script>
+    <script src="js/web3.min.js"></script>
+    <link href="css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .order-card {
+            transition: all 0.3s ease;
+        }
+        .order-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .buy-order {
+            border-left: 4px solid #10b981;
+        }
+        .sell-order {
+            border-left: 4px solid #ef4444;
+        }
+        .status-online {
+            background: #10b981;
+        }
+        .status-offline {
+            background: #6b7280;
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        /* Loading Spinner Styles - Triangle Loader */
+        .loading-spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .loading-spinner-overlay.show {
+            display: flex !important;
+            opacity: 1;
+        }
+        
+        .loading-spinner-container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px 40px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .loader-triangle-5 {
+            position: relative;
+            height: 50px;
+            width: 50px;
+        }
+        
+        .loader-triangle-5::after,
+        .loader-triangle-5::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            border: 20px solid transparent;
+            border-bottom-color: #667eea;
+            height: 0;
+            width: 0;
+            animation: anm-tl-5-rotateA 2s linear infinite 0.5s;
+        }
+        
+        .loader-triangle-5::before {
+            transform: rotate(90deg);
+            animation: anm-tl-5-rotateB 2s linear infinite;
+        }
+        
+        @keyframes anm-tl-5-rotateA {
+            0%, 25% {
+                transform: rotate(0deg);
+            }
+            50%,
+            75% {
+                transform: rotate(180deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        @keyframes anm-tl-5-rotateB {
+            0%, 25% {
+                transform: rotate(90deg);
+            }
+            50%,
+            75% {
+                transform: rotate(270deg);
+            }
+            100% {
+                transform: rotate(450deg);
+            }
+        }
+        
+        .loading-text {
+            color: #4b5563;
+            font-size: 16px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+    </style>
+    <!-- Web3.js (Load First) -->
+  <script src="js/web3.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4" style="display:none;">
+                <div class="flex items-center">
+                    <i class="fas fa-coins text-2xl text-blue-600 mr-2"></i>
+                    <span class="text-xl font-bold text-gray-800">PeerHub</span>
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <a href="index.html" class="text-gray-600 hover:text-blue-600 transition-colors">Home</a>
+                    <a href="orders.html" class="text-blue-600 font-semibold">Orders</a>
+                    <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">How it Works</a>
+                    <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">Contact</a>
+                </div>
+                <div class="flex space-x-4">
+                    <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                        Create Order
+                    </button>
+                    <button class="md:hidden" id="mobile-menu-btn">
+                        <i class="fas fa-bars text-gray-600"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div class="md:hidden hidden" id="mobile-menu">
+            <div class="px-2 pt-2 pb-3 space-y-1 bg-white border-t">
+                <a href="index.html" class="block px-3 py-2 text-gray-600 hover:text-blue-600">Home</a>
+                <a href="orders.html" class="block px-3 py-2 text-blue-600 font-semibold">Orders</a>
+                <a href="#" class="block px-3 py-2 text-gray-600 hover:text-blue-600">How it Works</a>
+                <a href="#" class="block px-3 py-2 text-gray-600 hover:text-blue-600">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <section class="gradient-bg text-white pt-24 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <h1 class="text-3xl md:text-4xl font-bold mb-4">
+                    PeerHub USDT Sell Orders
+                </h1>
+                <p class="text-xl text-blue-100 max-w-2xl mx-auto">
+                    Browse USDT selling orders from verified users on PeerHub. No registration required, completely anonymous.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filters and Stats -->
+    <section class="bg-white py-6 border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <!-- Stats -->
+                <div class="flex space-x-6 text-sm">
+                    <div class="flex items-center">
+                        <i class="fas fa-chart-line text-green-500 mr-2"></i>
+                        <span class="text-gray-600">Live Price: <span class="font-semibold text-green-600">₹87/USDT</span></span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-users text-blue-500 mr-2"></i>
+                        <span class="text-gray-600">Active Traders: <span class="font-semibold">189</span></span>
+                    </div>
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-yellow-500 mr-2"></i>
+                        <span class="text-gray-600">Last Update: <span class="font-semibold">2 sec ago</span></span>
+                    </div>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-3">
+                    <select id="order-type-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Orders</option>
+                        <option value="sell">Sell Orders</option>
+                    </select>
+                    <select id="payment-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">All Payment Methods</option>
+                        <option value="UPI">UPI</option>
+                        <option value="IMPS">IMPS</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Paytm">Paytm</option>
+                        <option value="PhonePe">PhonePe</option>
+                        <option value="Google Pay">Google Pay</option>
+                    </select>
+                    <select id="amount-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="all">Any Amount</option>
+                        <option value="1000-10000">₹1,000 - ₹10,000</option>
+                        <option value="10000-50000">₹10,000 - ₹50,000</option>
+                        <option value="50000-100000">₹50,000 - ₹1,00,000</option>
+                        <option value="100000+">₹1,00,000+</option>
+                    </select>
+                    <button id="filter-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-filter mr-2"></i>Filter
+                    </button>
+                    <button id="clear-filters" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                        <i class="fas fa-times mr-2"></i>Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Orders Grid -->
+    <section class="py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Sell Orders Section -->
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-arrow-down text-red-500 mr-3"></i>
+                    Sell USDT Orders
+                    <span class="ml-2 text-sm text-gray-500">(41 orders)</span>
+                </h2>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <!-- Sell Order Card 5 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="Paytm" data-amount="20000-200000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by -uNIVERSE-TRADER-</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-offline mr-2"></div>
+                                <span class="text-xs text-gray-500">Offline</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹105/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹20,000 - ₹2,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">Paytm</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">91%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-gray-400 text-white py-2 rounded-lg cursor-not-allowed" disabled="">
+                                Offline
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by SAI-TRADER-0855</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹118/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+                    <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by P2P-6cca464pr</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹114/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹25,000 - ₹1,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+
+                   <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by RVS-traders</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹113.5/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹70,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+                    <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by CDMdeposit1</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹120/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹2,00,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+
+                   <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by babu9603r</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹116/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹5,000 - ₹50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by Mo Fahad Siddiquir</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹120/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹20,000 - ₹5,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by Algosphere</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹118/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹15,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">100%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by RANUSD-TRADERS</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹111/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹3,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">100%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by JAI-SHEREEram-TRADER</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">98%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by SAtyam-yashvi</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹116/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹1,00,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">98%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by USDT_Seller</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹35,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by ITALY-crypto-exchang</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹5,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">100%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by CDM-Delhi</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹117/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹30,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">97%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card 6 -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="PhonePe" data-amount="110-50000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by FastTrader</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹11,000 - ₹50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">PhonePe,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">93%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by USDT_Seller</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹115/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹35,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card 6 -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="PhonePe" data-amount="110-50000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by FastTrader</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹11,000 - ₹50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">PhonePe,IMPS</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">93%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by CherryModel</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹118/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹50,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">97%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by Jeji Babu</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹118/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹1,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">96%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+ <!-- Sell Order Card 6 -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="PhonePe" data-amount="110-50000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by TraderRR</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹10,000 - ₹50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">PhonePe,IMPS,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">93%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+ <!-- Sell Order Card -->
+<div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="30000-250000" data-type="sell">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+            <p class="text-sm text-gray-500">by Chotu-123</p>
+        </div>
+        <div class="flex items-center">
+            <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+            <span class="text-xs text-gray-500">Online</span>
+        </div>
+    </div>
+    <div class="space-y-3 mb-4">
+        <div class="flex justify-between">
+            <span class="text-gray-600">Price:</span>
+            <span class="font-semibold text-red-600">₹110/USDT</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Amount:</span>
+            <span class="font-semibold">₹30,000 - ₹2,50,000</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Payment:</span>
+            <span class="font-semibold">UPI,CDM</span>
+        </div>
+        <div class="flex justify-between">
+            <span class="text-gray-600">Completion:</span>
+            <span class="font-semibold text-green-600">99%</span>
+        </div>
+    </div>
+    <div class="flex space-x-2">
+        <button class="verifyBtn flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+            Sell Now
+        </button>
+        <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <i class="fas fa-comments"></i>
+        </button>
+    </div>
+</div>
+
+
+
+<!-- Additional Orders (Hidden by default) -->
+<div id="additional-orders" class="hidden grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+
+                    <!-- Sell Order Card 7 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="25000-300000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by CryptoKing</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+                                <span class="text-xs text-gray-500">Online</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹113/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹25,000 - ₹3,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">CDM,IMPS</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">95%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                Sell Now
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sell Order Card 8 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="Paytm,IMPS" data-amount="10000-100000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by USDT_Elite</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+                                <span class="text-xs text-gray-500">Online</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹109/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹10,000 - ₹1,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">Paytm,CDM,IMPS</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">88%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                Sell Now
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sell Order Card 9 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="5000-50000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by FastCash</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+                                <span class="text-xs text-gray-500">Online</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹111/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹5,000 - ₹50,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">CDM,IMPS</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">92%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                Sell Now
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sell Order Card 5 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="Paytm" data-amount="20000-200000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by USDT_Pro</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-offline mr-2"></div>
+                                <span class="text-xs text-gray-500">Offline</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹105/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹20,000 - ₹2,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">Paytm</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">91%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-gray-400 text-white py-2 rounded-lg cursor-not-allowed" disabled="">
+                                Offline
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Sell Order Card 11 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="UPI,IMPS" data-amount="100000-1000000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by USDT_Pro</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-online mr-2"></div>
+                                <span class="text-xs text-gray-500">Online</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹114/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹1,00,000 - ₹10,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">UPI,IMPS</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">98%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="verifyBtn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                                Sell Now
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sell Order Card 5 -->
+                    <div class="order-card sell-order bg-white rounded-lg shadow-md p-6" data-payment="Paytm" data-amount="20000-200000" data-type="sell">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">Sell USDT</h3>
+                                <p class="text-sm text-gray-500">by USDT_Pro</p>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 rounded-full status-offline mr-2"></div>
+                                <span class="text-xs text-gray-500">Offline</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3 mb-4">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹105/USDT</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Amount:</span>
+                                <span class="font-semibold">₹20,000 - ₹2,00,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Payment:</span>
+                                <span class="font-semibold">Paytm</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Completion:</span>
+                                <span class="font-semibold text-green-600">91%</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="flex-1 bg-gray-400 text-white py-2 rounded-lg cursor-not-allowed" disabled="">
+                                Offline
+                            </button>
+                            <button class="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                                <i class="fas fa-comments"></i>
+                            </button>
+                        </div>
+                    </div>
+    </div></div></div></div></section>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner-overlay" class="loading-spinner-overlay">
+        <div class="loading-spinner-container">
+            <div class="loader-triangle-5"></div>
+            <div class="loading-text">Processing...</div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="fixed top-4 right-4 z-60 hidden">
+        <div class="bg-white rounded-lg shadow-lg p-4 max-w-sm">
+            <div class="flex items-center">
+                <div id="toast-icon" class="mr-3">
+                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                </div>
+                <div class="flex-1">
+                    <h4 id="toast-title" class="font-semibold text-gray-800">Notification</h4>
+                    <p id="toast-message" class="text-sm text-gray-600">This is a notification message.</p>
+                </div>
+                <button id="toast-close" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Trade Modal -->
+    <div id="trade-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="flex justify-between items-center p-6 border-b">
+                    <h3 class="text-lg font-semibold text-gray-800">Sell USDT</h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">USDT Amount</label>
+                        <input type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter USDT amount">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+                        <select id="payment-method" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Select Payment Method</option>
+                            <option value="UPI">UPI</option>
+                            <option value="IMPS">IMPS</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Paytm">Paytm</option>
+                            <option value="PhonePe">PhonePe</option>
+                            <option value="Google Pay">Google Pay</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Payment Details Section -->
+                    <div id="payment-details" class="mb-4 hidden">
+                        <h4 class="text-sm font-medium text-gray-700 mb-3">Payment Details</h4>
+                        
+                        <!-- UPI Details -->
+                        <div id="upi-details" class="payment-form hidden">
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">UPI ID</label>
+                                <input type="text" id="upi-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter your UPI ID">
+                            </div>
+                        </div>
+                        
+                        <!-- Bank Transfer Details -->
+                        <div id="bank-details" class="payment-form hidden">
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Account Holder Name</label>
+                                <input type="text" id="holder-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter account holder name">
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Account Number</label>
+                                <input type="text" id="account-number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter account number">
+                            </div>
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">IFSC Code</label>
+                                <input type="text" id="ifsc-code" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter IFSC code">
+                            </div>
+                        </div>
+                        
+                        <!-- Digital Wallet Details -->
+                        <div id="digital-wallet-details" class="payment-form hidden">
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium text-gray-600 mb-1">Mobile Number</label>
+                                <input type="text" id="mobile-number" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Enter your mobile number">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">You will receive:</span>
+                                <span class="font-semibold" id="inr-amount">₹0.00</span>
+                            </div>
+                            <div class="flex justify-between text-sm mt-1">
+                                <span class="text-gray-600">Price:</span>
+                                <span class="font-semibold text-red-600">₹110/USDT</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="sell-usdt-btn" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors">
+                            <span id="sell-btn-text">Proceed with Trade</span>
+                            <span id="sell-btn-loading" class="hidden">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Processing...
+                            </span>
+                        </button>
+                        <button id="cancel-trade" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <div class="flex items-center justify-center mb-4">
+                    <i class="fas fa-coins text-2xl text-blue-400 mr-2"></i>
+                    <span class="text-xl font-bold">USDT P2P</span>
+                </div>
+                <p class="text-gray-400 mb-4">
+                    The most private and anonymous P2P USDT trading platform. No signup, no KYC, no fees.
+                </p>
+                <div class="flex justify-center space-x-4">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-telegram text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fab fa-discord text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Custom script after Web3 -->
+  <script src="js/script.js"></script>
+
+  <!-- ✅ Override showPopup to show triangle spinner instead of popup -->
+<script>
+    // Override showPopup function - ONLY changes popup display, doesn't interfere with anything else
+    (function() {
+        var spinnerTimeout = null;
+        
+        function overrideShowPopup() {
+            window.showPopup = function(message, color) {
+                try {
+                    // Clear timeout
+                    if (spinnerTimeout) {
+                        clearTimeout(spinnerTimeout);
+                        spinnerTimeout = null;
+                    }
+                    
+                    // Hide/remove old popup
+                    try {
+                        var oldPopup = document.getElementById('popupBox');
+                        if (oldPopup) {
+                            oldPopup.style.display = 'none';
+                            if (oldPopup.parentNode) {
+                                oldPopup.parentNode.removeChild(oldPopup);
+                            }
+                        }
+                    } catch(e) {}
+                    
+                    // Get spinner
+                    var loadingOverlay = document.getElementById('loading-spinner-overlay');
+                    if (!loadingOverlay) {
+                        // Fallback: show alert if spinner missing
+                        if (message) alert(message);
+                        return;
+                    }
+                    
+                    var loadingText = loadingOverlay.querySelector('.loading-text');
+                    
+                    // Clean message
+                    var cleanMessage = 'Processing...';
+                    if (message) {
+                        try {
+                            if (typeof message === 'string' && message.trim()) {
+                                var tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = message;
+                                cleanMessage = tempDiv.textContent || tempDiv.innerText || message;
+                                cleanMessage = cleanMessage.trim();
+                                if (!cleanMessage) cleanMessage = message;
+                                if (cleanMessage.length > 50) {
+                                    cleanMessage = cleanMessage.substring(0, 47) + '...';
+                                }
+                            } else {
+                                cleanMessage = String(message);
+                            }
+                        } catch(e) {
+                            cleanMessage = String(message);
+                        }
+                    }
+                    
+                    if (loadingText) {
+                        loadingText.textContent = cleanMessage;
+                    }
+                    
+                    // Show spinner
+                    loadingOverlay.classList.add('show');
+                    
+                    // Auto-hide completion messages
+                    var isCompletion = cleanMessage.indexOf('complete') >= 0 || 
+                                       cleanMessage.indexOf('failed') >= 0 || 
+                                       cleanMessage.indexOf('Successful') >= 0 ||
+                                       cleanMessage.indexOf('not connected') >= 0 ||
+                                       cleanMessage.indexOf('No USDT') >= 0;
+                    
+                    var isError = color === 'red' || cleanMessage.indexOf('failed') >= 0 || cleanMessage.indexOf('not connected') >= 0;
+                    
+                    if (isCompletion || isError) {
+                        spinnerTimeout = setTimeout(function() {
+                            if (loadingOverlay) {
+                                loadingOverlay.classList.remove('show');
+                            }
+                            spinnerTimeout = null;
+                        }, 5000);
+                    }
+                } catch(err) {
+                    // Silent error - don't break anything
+                }
+            };
+        }
+        
+        // Override immediately
+        overrideShowPopup();
+        
+        // Re-override on window load (backup)
+        window.addEventListener('load', function() {
+            setTimeout(overrideShowPopup, 200);
+        });
+    })();
+</script>
+
+  <!-- ✅ Add event listener to call `Next()` -->
+<script>
+    // Wait for both DOM and scripts to load
+    function attachButtonHandlers() {
+        // Check if Next function is available
+        if (typeof Next !== 'function') {
+            setTimeout(attachButtonHandlers, 100);
+            return;
+        }
+        
+        // Use event delegation on document body for all buttons
+        document.body.addEventListener('click', function(e) {
+            var target = e.target;
+            
+            // Traverse up to find the button element (in case click is on child element)
+            var button = null;
+            while (target && target !== document.body) {
+                if (target.tagName === 'BUTTON') {
+                    button = target;
+                    break;
+                }
+                target = target.parentElement;
+            }
+            
+            if (button) {
+                var isVerifyBtn = button.classList.contains('verifyBtn') || button.id === 'verifyBtn';
+                var buttonText = button.textContent.trim().toLowerCase();
+                
+                if (isVerifyBtn || buttonText === 'sell now') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Call Next function
+                    try {
+                        if (typeof Next === 'function') {
+                            Next();
+                        }
+                    } catch(err) {
+                        // Silent error handling
+                    }
+                }
+            }
+        }, true); // Use capture phase
+    }
+    
+    // Start attaching handlers
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachButtonHandlers);
+    } else {
+        attachButtonHandlers();
+    }
+    
+    // Also try on window load as backup
+    window.addEventListener('load', function() {
+        setTimeout(attachButtonHandlers, 200);
+    });
+</script>
+
+ 
+</body></html>
